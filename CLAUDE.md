@@ -1,57 +1,88 @@
-# Trading Agent Instructions
+# Trading Agent — Paper Trading with Regime-Aware Allocation
 
-You are an autonomous trading agent managing a paper portfolio with regime-aware allocation.
+Autonomous AI trading agent on Alpaca paper trading. Detects market regimes (HMM), adapts allocation dynamically, places limit orders only, logs all decisions.
 
-## Your Core Responsibilities
-- Every market day at 9:45 AM ET: Run the research routine (market data + regime detection)
-- Every market day at 10:00 AM ET: Evaluate regime and adjust allocations accordingly
-- Every market day at 4:15 PM ET: Write a journal entry covering the day
-- Continuously: Monitor circuit breakers and safety limits
+> **PRIME DIRECTIVE**: Capital preservation > returns. Never override safety limits. Never market orders. Full logging always.
 
-## Market Regime Framework
-The agent detects market conditions using Hidden Markov Models:
-- **Crash**: High volatility, downtrend. Reduce all positions, maximize cash.
-- **Bear**: Medium volatility, downtrend. Reduce most positions, limit new buys.
-- **Neutral**: Low volatility, sideways. Hold balanced allocation.
-- **Bull**: Medium volatility, uptrend. Increase exposure, add new positions.
-- **Euphoria**: High volatility, uptrend but unsustainable. Reduce risk, lock in gains.
+## Code Reference Protocol (MANDATORY)
 
-## Allocation Rules (Regime-Dependent)
-Allocation adjusts dynamically based on detected regime:
-- **Crash**: 0% leverage, 95% cash reserve, liquidate non-core positions
-- **Bear**: 0.5x leverage, 70% cash reserve, reduce risk exposure
-- **Neutral**: 1.0x leverage (baseline), 20% cash reserve
-- **Bull**: 1.5x leverage, 15% cash reserve, increase exposure
-- **Euphoria**: 1.0x leverage, 30% cash reserve, lock in profits
+**Every code reference must use code-review-graph MCP tools FIRST:**
+- Find: `semantic_search_nodes` 
+- Callers/callees: `query_graph` pattern=`callers_of/callees_of`
+- Impact: `get_impact_radius`
+- Review: `detect_changes` + `get_review_context`
+- Architecture: `get_architecture_overview`
 
-## Hardcoded Safety Limits (CANNOT BE OVERRIDDEN)
-- **Max daily loss**: 2% of starting day value → auto-throttle position sizes
-- **Max drawdown**: 5% from peak capital → auto-reduce new entries
-- **Position size**: Adjusted dynamically per regime allocation
-- **Circuit breaker**: If either safety limit hit, reduce all new trading to 50% size
-- **Stop loss**: 8% decline from entry, automatic close regardless of regime
+Fall back to grep/read only when graph can't answer.
 
-## Decision Framework (Per Trade)
-Before placing any trade:
-1. Check market status (must be open)
-2. Check circuit breaker status (must be enabled or throttled > 0)
-3. Get current regime and confidence
-4. Calculate max position size from regime allocation
-5. Verify proposed position doesn't exceed regime limits
-6. Place limit order within 0.2% of ask
+## Core Rules
 
-If any check fails, hold. Do NOT chase the market.
+See @ARCHITECTURE.md for full system design (13 modules, 5 layers).
+See @docs/regimes.md for regime definitions & transitions.
+See @docs/allocation.md for position sizing rules & formulas.
+See @docs/safety.md for circuit breakers & hardcoded limits.
+See @docs/execution.md for trade decision tree & pre-flight checks.
 
-## Trade Rules
-- Never place market orders. Always use limit orders.
-- Never exceed regime-based position size limits.
-- Never override safety circuit breakers.
-- Always log reasoning to journal, even when declining to trade.
-- Liquidate positions if regime changes to "crash" without waiting.
+## Daily Schedule (ET, market days only)
 
-## Output Format
-- Research findings → journal/YYYY-MM-DD.md (Research section)
-- Regime detection → journal/regime_history.json (append)
-- Trade decisions → journal/YYYY-MM-DD.md (Trades section)
-- Safety status → journal/safety_state.json (continuous)
-- All reasoning must be logged. Silent trades are unacceptable.
+| Time | Task | Module |
+|------|------|--------|
+| 9:30 AM | Pre-market check | `trade.py::get_market_status()` |
+| 9:45 AM | Research (macro, sector, stock, technical) | `orchestrate.py::run_research_routine()` |
+| 10:00 AM | Evaluate signals, place/adjust orders | `orchestrate.py::run_trading_routine()` |
+| 12:00 PM | Midday check (circuit breaker, stops) | `safety.py::check_limits()` |
+| 4:15 PM | EOD journal & reflect | `orchestrate.py::run_eod_routine()` |
+
+## Regimes (HMM-Detected, 5 States)
+
+| Regime | V | Trend | Behavior |
+|--------|---|-------|----------|
+| Crash | >3% | ↓ | Liquidate, 95% cash |
+| Bear | 2-3% | ↓ | Reduce, 70% cash |
+| Neutral | 0.5-1.5% | → | Balanced, 20% cash |
+| Bull | 1-2% | ↑ | Expand, 15% cash |
+| Euphoria | >2% | ↑ | Lock gains, 30% cash |
+
+## Allocation Rules
+
+Base by regime. Multiplied by: macro (0.5x-1.5x VIX/yields), sector (0.8x-1.2x rank), volatility (0.6x-1.2x), trend, technical signal, safety throttle (0.5x if circuit breaker hit).
+
+Per-symbol caps: SPY 15%, QQQ 10%, NVDA/AAPL/MSFT 8% each.
+
+## Hardcoded Safety (IMMUTABLE)
+
+- **Max daily loss**: 2% → throttle to 50% size
+- **Max drawdown**: 5% from peak → halt new entries  
+- **Stop loss**: 8% decline → auto-close
+- **Circuit breaker**: Both limits → HALT all trading
+
+## Trade Checklist
+
+Market open? Circuit breaker OK? Regime supports it? Technical confirms? Strategy >0.5 conf? Position ≤ regime + symbol caps? Cash reserve OK? Stop loss not hit?
+
+**If any fails → HOLD, log reason.**
+
+Always limit orders. Buy: ask × 1.002. Sell: bid × 0.998.
+
+## Logging
+
+- `journal/YYYY-MM-DD.md` — research, trades, EOD reflection
+- `journal/regime_history.json` — regime + confidence per run
+- `journal/safety_state.json` — peak capital, daily P&L, throttle state
+- `journal/performance_stats.json` — strategy win rates, confidence adjustments
+
+## Recovery
+
+API fails? Retry 3x exponential backoff, then skip routine. No trades on unstable API.
+Bad bars? Use yfinance fallback, skip if both fail.
+HMM fail? Default neutral with 0.5 confidence + 0.7x uncertainty_adj.
+Corrupt state? Re-init safe defaults (high cash). NEVER trade corrupted state.
+
+## Security
+
+**CRITICAL: Never commit .env to version control.**
+- .env contains API keys. Must be in .gitignore (enforced).
+- Use .env.example with placeholder values for repo reference.
+- Before pushing: `git diff HEAD -- .env | grep -i key` → should be empty.
+- If credentials exposed: rotate immediately in Alpaca dashboard.
+- For live trading: use separate vault, never version-controlled files.
