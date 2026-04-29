@@ -1,0 +1,6 @@
+requests>=2.31.0
+python-dotenv>=1.0.0
+hmmlearn>=0.3.2
+streamlit>=1.28.1
+pandas>=2.1.0
+numpy>=1.26.0

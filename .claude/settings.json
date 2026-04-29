@@ -1,0 +1,16 @@
+{
+  "project_name": "Trading Agent",
+  "description": "24/7 AI trading agent with Alpaca API integration",
+  "permissions": {
+    "read": {
+      "bash": ["python scripts/research.py *", "python scripts/trade.py status"]
+    },
+    "write": {
+      "bash": ["python scripts/trade.py order *"]
+    }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"/Users/saitarrunpitta/Claude/config/plugins/cache/caveman/caveman/84cc3c14fa1e/hooks/caveman-statusline.sh\""
+  }
+}
