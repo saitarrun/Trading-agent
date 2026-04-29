@@ -300,10 +300,47 @@ def run_trading_routine(state):
         journal_entry += f"|------|--------|--------|-----|-------|----------|\n"
         journal_entry += f"| - | - | - | - | - | No trades executed (regime: {regime}) |\n"
 
+        # Execute trades for each watchlist symbol
+        trades_executed = []
+        with open(watchlist_path, 'r') as f:
+            watchlist = json.load(f)
+
+        for ticker in watchlist.get("watchlist", []):
+            symbol = ticker["symbol"]
+
+            # Get bars for this symbol
+            try:
+                bars_response = get_bars(symbol, "1Day", limit=50)
+                bars = [{"c": b["c"], "h": b["h"], "l": b["l"]} for b in bars_response["bars"].values()] if "bars" in bars_response else None
+            except:
+                bars = None
+
+            if not bars:
+                continue
+
+            # Evaluate and execute
+            trade_result = evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status)
+
+            if trade_result:
+                trades_executed.append(trade_result)
+                print(f"[TRADING] {symbol}: {trade_result['action']} {trade_result.get('qty', 0)} @ ${trade_result.get('price', 0):.2f}")
+
+        # Log trades
+        journal_entry = f"\n## Trades Executed\n"
+        journal_entry += f"| Time | Symbol | Action | Qty | Price | Reasoning |\n"
+        journal_entry += f"|------|--------|--------|-----|-------|----------|\n"
+
+        if trades_executed:
+            for trade in trades_executed:
+                if trade['action'] != 'hold':
+                    journal_entry += f"| {datetime.now().strftime('%H:%M')} | {trade['symbol']} | {trade['action'].upper()} | {trade.get('qty', 0)} | ${trade.get('price', 0):.2f} | {trade.get('reason', 'N/A')} |\n"
+        else:
+            journal_entry += f"| - | - | - | - | - | No trades (regime: {regime}) |\n"
+
         with open(journal_file, 'a') as f:
             f.write(journal_entry)
 
-        print("[TRADING] Session complete. Journal updated.")
+        print("[TRADING] Session complete. Trades logged.")
         state.record_routine("trading", success=True)
         return True
 
@@ -312,6 +349,86 @@ def run_trading_routine(state):
         traceback.print_exc()
         state.record_routine("trading", success=False)
         return False
+
+def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status):
+    """Evaluate single symbol and place orders if conditions met."""
+    try:
+        if not market_status.get("is_open"):
+            return None
+
+        current_price = bars[-1]["c"] if bars else None
+        if not current_price:
+            return None
+
+        account_value = float(account['portfolio_value'])
+        uncertain = False  # Would be passed from regime detection
+
+        # Get allocation for this regime
+        allocation = allocator.calculate_allocation(regime, account_value, positions if isinstance(positions, list) else [], bars, uncertain)
+        max_size = allocation["max_position_size"]
+        leverage = allocation["leverage_multiplier"]
+
+        # Check if position already exists
+        existing_pos = next((p for p in (positions if isinstance(positions, list) else []) if p['symbol'] == symbol), None)
+        current_qty = int(existing_pos['qty']) if existing_pos else 0
+
+        # Decide action based on regime + trend
+        if regime == "crash":
+            action = "sell" if current_qty > 0 else None
+        elif regime == "bear":
+            action = "sell" if current_qty > 0 else None
+        elif regime == "euphoria":
+            action = "sell" if current_qty > 20 else None  # Take profits
+        elif regime == "bull":
+            action = "buy" if current_qty == 0 else None
+        else:  # neutral
+            action = None  # Hold
+
+        if not action or not safety_status['trading_enabled']:
+            return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": f"Regime {regime}, safety enabled: {safety_status['trading_enabled']}"}
+
+        # Size position
+        qty = int(max_size / current_price) if max_size > 0 else 0
+        if qty == 0:
+            return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "Position size too small"}
+
+        # Apply throttle
+        throttle = safety.calculate_throttle_factor(account_value)
+        qty = int(qty * throttle)
+
+        if action == "sell" and current_qty > 0:
+            # Close position
+            sell_qty = current_qty
+            limit_price = current_price * 0.99  # Sell at slight discount
+            from trade import place_order
+            result = place_order(symbol, sell_qty, "sell", limit_price)
+            return {
+                "symbol": symbol,
+                "action": "sell",
+                "qty": sell_qty,
+                "price": limit_price,
+                "reason": f"{regime} regime, close position",
+                "order_result": result
+            }
+        elif action == "buy" and qty > 0:
+            # Open position
+            limit_price = current_price * 1.001  # Buy at slight premium
+            from trade import place_order
+            result = place_order(symbol, qty, "buy", limit_price)
+            return {
+                "symbol": symbol,
+                "action": "buy",
+                "qty": qty,
+                "price": limit_price,
+                "reason": f"{regime} regime, entry signal",
+                "order_result": result
+            }
+
+        return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "No signal"}
+
+    except Exception as e:
+        print(f"[TRADING] Error evaluating {symbol}: {e}")
+        return {"symbol": symbol, "action": "error", "error": str(e)}
 
 def run_eod_routine(state):
     """End-of-day routine: finalize journal and update state."""
