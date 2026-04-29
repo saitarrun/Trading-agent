@@ -20,6 +20,8 @@ from macro import MacroAnalyzer
 from technical import TechnicalAnalyzer
 from fundamentals import FundamentalAnalyzer, SectorAnalyzer
 from strategies import StrategySelector
+from performance import PerformanceTracker
+from position_tracker import PositionTracker
 
 class OrchestratorState:
     """Tracks system state for resilience and error handling."""
@@ -375,6 +377,24 @@ def run_trading_routine(state):
                 print("[TRADING] CIRCUIT BREAKER ACTIVE - NO NEW TRADES")
                 return False
 
+        # Load performance tracker and position tracker
+        performance_tracker = PerformanceTracker()
+        position_tracker = PositionTracker()
+
+        # Check for exited positions and record trades
+        for symbol, entry_data in list(position_tracker.get_all().items()):
+            existing_pos = next((p for p in (positions if isinstance(positions, list) else []) if p['symbol'] == symbol), None)
+            current_qty = int(existing_pos['qty']) if existing_pos else 0
+
+            exited, exit_price = position_tracker.detect_exit(symbol, bars[-1]['c'] if bars else 0, current_qty)
+            if exited and exit_price:
+                entry_price = entry_data['entry_price']
+                strategy = entry_data['strategy']
+                regime_at_entry = entry_data['regime']
+                qty = entry_data['qty']
+                performance_tracker.record_trade(symbol, strategy, regime_at_entry, entry_price, exit_price, qty, entry_data['entry_time'], datetime.now().isoformat())
+                position_tracker.close_position(symbol)
+
         today_date = datetime.now().strftime("%Y-%m-%d")
         journal_file = Path(f"journal/{today_date}.md")
 
@@ -402,7 +422,7 @@ def run_trading_routine(state):
                 continue
 
             # Evaluate and execute
-            trade_result = evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status)
+            trade_result = evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker, position_tracker)
 
             if trade_result:
                 trades_executed.append(trade_result)
@@ -433,7 +453,7 @@ def run_trading_routine(state):
         state.record_routine("trading", success=False)
         return False
 
-def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status):
+def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker=None, position_tracker=None):
     """Evaluate single symbol using regime + technical + strategy, place orders if conditions met."""
     try:
         if not market_status.get("is_open"):
@@ -451,10 +471,14 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         tech_data = tech_analyzer.analyze()
         tech_signal = tech_data['trade_signal']
 
-        # Strategy selection
-        strategy_selector = StrategySelector(bars)
+        # Strategy selection with performance feedback
+        strategy_selector = StrategySelector(bars, regime=regime, performance_tracker=performance_tracker)
         strategy_data = strategy_selector.analyze()
         selected_strategy = strategy_data['selected_strategy']
+        base_confidence = strategy_data['strategy_details']['confidence']
+
+        # Note: confidence may have been adjusted by performance tracker
+        final_confidence = strategy_data['strategy_details'].get('confidence', base_confidence)
 
         # Get allocation for this regime
         allocation = allocator.calculate_allocation(
@@ -519,6 +543,11 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         if qty == 0:
             return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "Position size too small"}
 
+        # Apply strategy performance multiplier (boost winning strategies, reduce losers)
+        if performance_tracker:
+            strategy_mult = performance_tracker.get_strategy_adjustment_multiplier(selected_strategy, regime)
+            qty = int(qty * strategy_mult)
+
         # Apply throttle
         throttle = safety.calculate_throttle_factor(account_value)
         qty = int(qty * throttle)
@@ -540,6 +569,11 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
             limit_price = current_price * 1.001
             from trade import place_order
             result = place_order(symbol, qty, "buy", limit_price)
+
+            # Record entry in position tracker for exit detection
+            if position_tracker:
+                position_tracker.record_entry(symbol, selected_strategy, regime, current_price, qty)
+
             return {
                 "symbol": symbol,
                 "action": "buy",

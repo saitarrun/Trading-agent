@@ -1,0 +1,23 @@
+{
+  "by_strategy_regime": {
+    "trend_trading_bull": {
+      "wins": 1,
+      "losses": 1,
+      "total_return": 0.006754385964912282,
+      "trades": 2,
+      "max_return": 0.013333333333333334,
+      "min_return": -0.006578947368421052
+    },
+    "breakout_trading_neutral": {
+      "wins": 1,
+      "losses": 0,
+      "total_return": 0.016666666666666666,
+      "trades": 1,
+      "max_return": 0.016666666666666666,
+      "min_return": 0.016666666666666666
+    }
+  },
+  "by_strategy": {},
+  "by_regime": {},
+  "last_updated": "2026-04-28T23:54:01.582851"
+}

@@ -8,12 +8,16 @@ import json
 class StrategySelector:
     """Select and execute appropriate trading strategy based on market conditions."""
 
-    def __init__(self, bars):
+    def __init__(self, bars, regime=None, performance_tracker=None):
         """
         Args:
             bars: List of dicts with 'c' (close), 'h' (high), 'l' (low), 'v' (volume)
+            regime: Current market regime (for performance feedback)
+            performance_tracker: PerformanceTracker instance for confidence adjustment
         """
         self.bars = bars
+        self.regime = regime
+        self.performance_tracker = performance_tracker
         self.df = self._build_dataframe()
 
     def _build_dataframe(self):
@@ -118,6 +122,12 @@ class StrategySelector:
 
         return None, 0
 
+    def _adjust_confidence_for_performance(self, strategy_name, base_confidence):
+        """Adjust confidence based on historical performance."""
+        if not self.performance_tracker or not self.regime:
+            return base_confidence
+        return self.performance_tracker.adjust_strategy_confidence(strategy_name, self.regime, base_confidence)
+
     def select_strategy(self):
         """Intelligently select trading strategy based on current market conditions."""
         volatility = self.calculate_volatility()
@@ -131,58 +141,65 @@ class StrategySelector:
 
         # Strategy selection logic
         if is_bull and not is_correction:
+            base_conf = 0.9 if roc > 2 else 0.7
             return "trend_trading", {
                 'description': 'Bullish trend - follow upside momentum',
-                'confidence': 0.9 if roc > 2 else 0.7,
+                'confidence': self._adjust_confidence_for_performance("trend_trading", base_conf),
                 'roc': roc,
                 'action': 'Buy dips, hold strength'
             }
 
         if is_bear:
+            base_conf = 0.9 if roc < -2 else 0.7
             return "trend_trading", {
                 'description': 'Bearish trend - reduce exposure',
-                'confidence': 0.9 if roc < -2 else 0.7,
+                'confidence': self._adjust_confidence_for_performance("trend_trading", base_conf),
                 'roc': roc,
                 'action': 'Avoid new longs, consider shorts'
             }
 
         if is_breakout and volatility < 0.05:
+            base_conf = 0.85
             return "breakout_trading", {
                 'description': 'Breakout opportunity from consolidation',
-                'confidence': 0.85,
+                'confidence': self._adjust_confidence_for_performance("breakout_trading", base_conf),
                 'volatility': volatility,
                 'action': 'Enter on close above resistance'
             }
 
         if is_range and volatility < 0.04:
+            base_conf = 0.8
             return "range_trading", {
                 'description': 'Range-bound market',
-                'confidence': 0.8,
+                'confidence': self._adjust_confidence_for_performance("range_trading", base_conf),
                 'distance_to_support': dist_low,
                 'distance_to_resistance': dist_high,
                 'action': 'Buy near support, sell near resistance'
             }
 
         if reversal_type == "bottom_reversal" and reversal_strength > 0.05:
+            base_conf = 0.75
             return "reversal_trading", {
                 'description': 'Potential bottom reversal',
-                'confidence': 0.75,
+                'confidence': self._adjust_confidence_for_performance("reversal_trading", base_conf),
                 'reversal_strength': reversal_strength,
                 'action': 'Watch for confirmation, buy breakout'
             }
 
         if reversal_type == "top_reversal":
+            base_conf = 0.7
             return "reversal_trading", {
                 'description': 'Potential top reversal',
-                'confidence': 0.7,
+                'confidence': self._adjust_confidence_for_performance("reversal_trading", base_conf),
                 'reversal_strength': reversal_strength,
                 'action': 'Take profits, reduce exposure'
             }
 
         if is_correction and abs(roc) > 1:
+            base_conf = 0.75
             return "momentum_trading", {
                 'description': 'Strong momentum despite pullback',
-                'confidence': 0.75,
+                'confidence': self._adjust_confidence_for_performance("momentum_trading", base_conf),
                 'roc': roc,
                 'action': 'Buy dip in strong uptrend'
             }
