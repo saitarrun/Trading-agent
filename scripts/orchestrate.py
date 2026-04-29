@@ -175,7 +175,8 @@ def run_research_routine(state):
         print("[RESEARCH] Running macro analysis...")
         macro = MacroAnalyzer()
         macro_data = macro.analyze()
-        print(f"[RESEARCH] Macro sentiment: {macro_data['macro_sentiment']} (VIX: {macro_data['vix']:.1f})")
+        vix_display = f"{macro_data['vix']:.1f}" if macro_data['vix'] is not None else "N/A"
+        print(f"[RESEARCH] Macro sentiment: {macro_data['macro_sentiment']} (VIX: {vix_display})")
 
         # SECTOR ANALYSIS
         print("[RESEARCH] Running sector analysis...")
@@ -272,7 +273,7 @@ def run_research_routine(state):
         journal_content = f"# Trade Journal — {today_date}\n\n"
         journal_content += "## Macro Analysis\n"
         journal_content += f"- Sentiment: {macro_data['macro_sentiment']} (score: {macro_data['macro_score']:.2f})\n"
-        journal_content += f"- VIX: {macro_data['vix']:.1f}\n"
+        journal_content += f"- VIX: {macro_data['vix']:.1f}\n" if macro_data['vix'] is not None else "- VIX: N/A (data unavailable)\n"
         journal_content += f"- Yield curve: {macro_data['yield_curve_status']}\n"
         journal_content += f"- Leverage multiplier: {macro_data['leverage_multiplier']:.2f}x\n"
 

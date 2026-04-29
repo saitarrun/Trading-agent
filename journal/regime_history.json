@@ -406,5 +406,28 @@
     "regime": "neutral",
     "confidence": 0.0,
     "characteristics": {}
+  },
+  {
+    "timestamp": "2026-04-29T16:49:15.544708",
+    "findings": [],
+    "macro": {
+      "vix": null,
+      "yield_curve_diff": 0,
+      "yield_curve_status": "unknown",
+      "fed_funds_rate": null,
+      "macro_score": 0.0,
+      "macro_sentiment": "neutral",
+      "leverage_multiplier": 1.0,
+      "timestamp": "2026-04-29T16:49:14.527269"
+    },
+    "sectors": {
+      "sector_performance": {},
+      "ranked_sectors": [],
+      "sector_weights": {},
+      "timestamp": "2026-04-29T16:49:15.073137"
+    },
+    "regime": "neutral",
+    "confidence": 0.0,
+    "characteristics": {}
   }
 ]

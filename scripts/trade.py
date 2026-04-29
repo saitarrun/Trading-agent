@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import sys
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,15 +44,34 @@ def cancel_all_orders():
     response = requests.delete(url, headers=headers)
     return response.status_code
 
+def _market_status_from_clock():
+    """Derive market open/closed from current ET time without hitting the broker API."""
+    from datetime import timezone, timedelta
+    et = timezone(timedelta(hours=-4))  # EDT; close enough for open/closed check
+    now = datetime.now(et)
+    is_weekday = now.weekday() < 5
+    market_open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    is_open = is_weekday and market_open_time <= now < market_close_time
+    from datetime import timedelta
+    next_open = (now + timedelta(days=1)).replace(hour=9, minute=30, second=0, microsecond=0).isoformat()
+    return {"is_open": is_open, "next_open": next_open, "source": "local_clock"}
+
 def get_market_status():
-    """Check if the market is open."""
+    """Check if the market is open. Falls back to local clock if Alpaca API unavailable."""
     headers = {
         "APCA-API-KEY-ID": ALPACA_KEY,
         "APCA-API-SECRET-KEY": ALPACA_SECRET,
     }
     url = f"{BASE_URL}/v2/clock"
-    response = requests.get(url, headers=headers)
-    return response.json()
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        print(f"[TRADE] Alpaca clock API returned {response.status_code}, falling back to local clock")
+    except Exception as e:
+        print(f"[TRADE] Alpaca clock API unreachable ({e}), falling back to local clock")
+    return _market_status_from_clock()
 
 def validate_order(symbol, qty, side, current_price, account_value, current_positions):
     """Pre-flight checks before placing any order."""
