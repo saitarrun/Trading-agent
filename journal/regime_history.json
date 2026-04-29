@@ -1,0 +1,410 @@
+[
+  {
+    "timestamp": "2026-04-29T07:55:19.285651",
+    "findings": [],
+    "macro": {
+      "vix": 17.940000534057617,
+      "yield_curve_diff": 0.8039999008178711,
+      "yield_curve_status": "normal",
+      "fed_funds_rate": 3.5900001525878906,
+      "macro_score": -0.12814500999450684,
+      "macro_sentiment": "neutral",
+      "leverage_multiplier": 0.9359274950027465,
+      "timestamp": "2026-04-29T07:55:13.281940"
+    },
+    "sectors": {
+      "sector_performance": {
+        "Information Technology": {
+          "etf": "XLK",
+          "return": 0.5295427195751795,
+          "current_price": 159.0050048828125
+        },
+        "Healthcare": {
+          "etf": "XLV",
+          "return": 0.038150107767500524,
+          "current_price": 142.05999755859375
+        },
+        "Energy": {
+          "etf": "XLE",
+          "return": 0.4578958810190621,
+          "current_price": 58.43000030517578
+        },
+        "Industrials": {
+          "etf": "XLI",
+          "return": 0.3221176633418771,
+          "current_price": 169.9550018310547
+        },
+        "Consumer Discretionary": {
+          "etf": "XLY",
+          "return": 0.18394647072434253,
+          "current_price": 116.91999816894531
+        },
+        "Consumer Staples": {
+          "etf": "XLP",
+          "return": 0.045426913213346444,
+          "current_price": 82.6449966430664
+        },
+        "Real Estate": {
+          "etf": "XLRE",
+          "return": 0.0975689709191184,
+          "current_price": 43.60499954223633
+        },
+        "Financials": {
+          "etf": "XLF",
+          "return": 0.08481417565500078,
+          "current_price": 51.994998931884766
+        },
+        "Utilities": {
+          "etf": "XLU",
+          "return": 0.19199756194577308,
+          "current_price": 45.95500183105469
+        },
+        "Materials": {
+          "etf": "XLB",
+          "return": 0.25011678545291316,
+          "current_price": 51.165000915527344
+        }
+      },
+      "ranked_sectors": [
+        {
+          "rank": 1,
+          "sector": "Information Technology",
+          "return": 0.5295427195751795
+        },
+        {
+          "rank": 2,
+          "sector": "Energy",
+          "return": 0.4578958810190621
+        },
+        {
+          "rank": 3,
+          "sector": "Industrials",
+          "return": 0.3221176633418771
+        },
+        {
+          "rank": 4,
+          "sector": "Materials",
+          "return": 0.25011678545291316
+        },
+        {
+          "rank": 5,
+          "sector": "Utilities",
+          "return": 0.19199756194577308
+        },
+        {
+          "rank": 6,
+          "sector": "Consumer Discretionary",
+          "return": 0.18394647072434253
+        },
+        {
+          "rank": 7,
+          "sector": "Real Estate",
+          "return": 0.0975689709191184
+        },
+        {
+          "rank": 8,
+          "sector": "Financials",
+          "return": 0.08481417565500078
+        },
+        {
+          "rank": 9,
+          "sector": "Consumer Staples",
+          "return": 0.045426913213346444
+        },
+        {
+          "rank": 10,
+          "sector": "Healthcare",
+          "return": 0.038150107767500524
+        }
+      ],
+      "sector_weights": {
+        "Information Technology": 1.2,
+        "Energy": 1.2,
+        "Industrials": 1.2,
+        "Materials": 1.0,
+        "Utilities": 1.0,
+        "Consumer Discretionary": 0.8,
+        "Real Estate": 0.8,
+        "Financials": 0.8,
+        "Consumer Staples": 0.8,
+        "Healthcare": 0.8
+      },
+      "timestamp": "2026-04-29T07:55:15.486000"
+    },
+    "regime": "neutral",
+    "confidence": 0.0,
+    "characteristics": {}
+  },
+  {
+    "timestamp": "2026-04-29T07:55:38.957145",
+    "findings": [],
+    "macro": {
+      "vix": 17.950000762939453,
+      "yield_curve_diff": 0.8039999008178711,
+      "yield_curve_status": "normal",
+      "fed_funds_rate": 3.5900001525878906,
+      "macro_score": -0.1282250118255615,
+      "macro_sentiment": "neutral",
+      "leverage_multiplier": 0.9358874940872193,
+      "timestamp": "2026-04-29T07:55:34.883358"
+    },
+    "sectors": {
+      "sector_performance": {
+        "Information Technology": {
+          "etf": "XLK",
+          "return": 0.5290134605829715,
+          "current_price": 158.9499969482422
+        },
+        "Healthcare": {
+          "etf": "XLV",
+          "return": 0.03825972073559557,
+          "current_price": 142.0749969482422
+        },
+        "Energy": {
+          "etf": "XLE",
+          "return": 0.45814548945788364,
+          "current_price": 58.439998626708984
+        },
+        "Industrials": {
+          "etf": "XLI",
+          "return": 0.3218453620888521,
+          "current_price": 169.9199981689453
+        },
+        "Consumer Discretionary": {
+          "etf": "XLY",
+          "return": 0.18404775360216688,
+          "current_price": 116.93000030517578
+        },
+        "Consumer Staples": {
+          "etf": "XLP",
+          "return": 0.04511075018942277,
+          "current_price": 82.62000274658203
+        },
+        "Real Estate": {
+          "etf": "XLRE",
+          "return": 0.0973173060276766,
+          "current_price": 43.595001220703125
+        },
+        "Financials": {
+          "etf": "XLF",
+          "return": 0.0850227720452372,
+          "current_price": 52.005001068115234
+        },
+        "Utilities": {
+          "etf": "XLU",
+          "return": 0.1918678424209562,
+          "current_price": 45.95000076293945
+        },
+        "Materials": {
+          "etf": "XLB",
+          "return": 0.25011678545291316,
+          "current_price": 51.165000915527344
+        }
+      },
+      "ranked_sectors": [
+        {
+          "rank": 1,
+          "sector": "Information Technology",
+          "return": 0.5290134605829715
+        },
+        {
+          "rank": 2,
+          "sector": "Energy",
+          "return": 0.45814548945788364
+        },
+        {
+          "rank": 3,
+          "sector": "Industrials",
+          "return": 0.3218453620888521
+        },
+        {
+          "rank": 4,
+          "sector": "Materials",
+          "return": 0.25011678545291316
+        },
+        {
+          "rank": 5,
+          "sector": "Utilities",
+          "return": 0.1918678424209562
+        },
+        {
+          "rank": 6,
+          "sector": "Consumer Discretionary",
+          "return": 0.18404775360216688
+        },
+        {
+          "rank": 7,
+          "sector": "Real Estate",
+          "return": 0.0973173060276766
+        },
+        {
+          "rank": 8,
+          "sector": "Financials",
+          "return": 0.0850227720452372
+        },
+        {
+          "rank": 9,
+          "sector": "Consumer Staples",
+          "return": 0.04511075018942277
+        },
+        {
+          "rank": 10,
+          "sector": "Healthcare",
+          "return": 0.03825972073559557
+        }
+      ],
+      "sector_weights": {
+        "Information Technology": 1.2,
+        "Energy": 1.2,
+        "Industrials": 1.2,
+        "Materials": 1.0,
+        "Utilities": 1.0,
+        "Consumer Discretionary": 0.8,
+        "Real Estate": 0.8,
+        "Financials": 0.8,
+        "Consumer Staples": 0.8,
+        "Healthcare": 0.8
+      },
+      "timestamp": "2026-04-29T07:55:36.279694"
+    },
+    "regime": "neutral",
+    "confidence": 0.0,
+    "characteristics": {}
+  },
+  {
+    "timestamp": "2026-04-29T07:57:05.071373",
+    "findings": [],
+    "macro": {
+      "vix": 17.950000762939453,
+      "yield_curve_diff": 0.8039999008178711,
+      "yield_curve_status": "normal",
+      "fed_funds_rate": 3.5900001525878906,
+      "macro_score": -0.1282250118255615,
+      "macro_sentiment": "neutral",
+      "leverage_multiplier": 0.9358874940872193,
+      "timestamp": "2026-04-29T07:56:57.807863"
+    },
+    "sectors": {
+      "sector_performance": {
+        "Information Technology": {
+          "etf": "XLK",
+          "return": 0.5288692867284924,
+          "current_price": 158.93499755859375
+        },
+        "Healthcare": {
+          "etf": "XLV",
+          "return": 0.03825972073559557,
+          "current_price": 142.0749969482422
+        },
+        "Energy": {
+          "etf": "XLE",
+          "return": 0.4585196979180468,
+          "current_price": 58.45500183105469
+        },
+        "Industrials": {
+          "etf": "XLI",
+          "return": 0.32171550264211746,
+          "current_price": 169.90330505371094
+        },
+        "Consumer Discretionary": {
+          "etf": "XLY",
+          "return": 0.18364269934706923,
+          "current_price": 116.88999938964844
+        },
+        "Consumer Staples": {
+          "etf": "XLP",
+          "return": 0.044857804797687494,
+          "current_price": 82.5999984741211
+        },
+        "Real Estate": {
+          "etf": "XLRE",
+          "return": 0.09794662168896444,
+          "current_price": 43.619998931884766
+        },
+        "Financials": {
+          "etf": "XLF",
+          "return": 0.08481417565500078,
+          "current_price": 51.994998931884766
+        },
+        "Utilities": {
+          "etf": "XLU",
+          "return": 0.19173812289613928,
+          "current_price": 45.94499969482422
+        },
+        "Materials": {
+          "etf": "XLB",
+          "return": 0.2497501882035146,
+          "current_price": 51.150001525878906
+        }
+      },
+      "ranked_sectors": [
+        {
+          "rank": 1,
+          "sector": "Information Technology",
+          "return": 0.5288692867284924
+        },
+        {
+          "rank": 2,
+          "sector": "Energy",
+          "return": 0.4585196979180468
+        },
+        {
+          "rank": 3,
+          "sector": "Industrials",
+          "return": 0.32171550264211746
+        },
+        {
+          "rank": 4,
+          "sector": "Materials",
+          "return": 0.2497501882035146
+        },
+        {
+          "rank": 5,
+          "sector": "Utilities",
+          "return": 0.19173812289613928
+        },
+        {
+          "rank": 6,
+          "sector": "Consumer Discretionary",
+          "return": 0.18364269934706923
+        },
+        {
+          "rank": 7,
+          "sector": "Real Estate",
+          "return": 0.09794662168896444
+        },
+        {
+          "rank": 8,
+          "sector": "Financials",
+          "return": 0.08481417565500078
+        },
+        {
+          "rank": 9,
+          "sector": "Consumer Staples",
+          "return": 0.044857804797687494
+        },
+        {
+          "rank": 10,
+          "sector": "Healthcare",
+          "return": 0.03825972073559557
+        }
+      ],
+      "sector_weights": {
+        "Information Technology": 1.2,
+        "Energy": 1.2,
+        "Industrials": 1.2,
+        "Materials": 1.0,
+        "Utilities": 1.0,
+        "Consumer Discretionary": 0.8,
+        "Real Estate": 0.8,
+        "Financials": 0.8,
+        "Consumer Staples": 0.8,
+        "Healthcare": 0.8
+      },
+      "timestamp": "2026-04-29T07:56:59.032211"
+    },
+    "regime": "neutral",
+    "confidence": 0.0,
+    "characteristics": {}
+  }
+]

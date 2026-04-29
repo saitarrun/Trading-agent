@@ -20,7 +20,7 @@ class MacroAnalyzer:
         try:
             vix = yf.download("^VIX", period="1d", progress=False)
             if vix is not None and len(vix) > 0:
-                self.vix_level = float(vix["Close"].iloc[-1])
+                self.vix_level = float(vix["Close"].values[-1].item())
                 return self.vix_level
         except Exception as e:
             print(f"[MACRO] VIX fetch failed: {e}")
@@ -34,8 +34,8 @@ class MacroAnalyzer:
             irx = yf.download("^IRX", period="1d", progress=False)  # 13-week T-bill (proxy for 2-year)
 
             if tnx is not None and irx is not None and len(tnx) > 0 and len(irx) > 0:
-                yield_10y = float(tnx["Close"].iloc[-1])
-                yield_2y = float(irx["Close"].iloc[-1])
+                yield_10y = float(tnx["Close"].values[-1].item())
+                yield_2y = float(irx["Close"].values[-1].item())
 
                 curve_diff = yield_10y - yield_2y
                 self.yield_curve_status = "inverted" if curve_diff < 0 else "normal"
@@ -50,7 +50,7 @@ class MacroAnalyzer:
         try:
             irx = yf.download("^IRX", period="1d", progress=False)  # 13-week T-bill
             if irx is not None and len(irx) > 0:
-                self.fed_funds = float(irx["Close"].iloc[-1])
+                self.fed_funds = float(irx["Close"].values[-1].item())
                 return self.fed_funds
         except Exception as e:
             print(f"[MACRO] Fed funds fetch failed: {e}")

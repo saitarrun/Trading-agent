@@ -196,9 +196,13 @@ def run_research_routine(state):
             try:
                 bars_response = get_bars(symbol, "1Day", limit=100)
                 if "bars" in bars_response:
+                    bars_list = bars_response["bars"]
+                    # Handle both dict (old API) and list (new API) formats
+                    if isinstance(bars_list, dict):
+                        bars_list = list(bars_list.values())
                     bars = [
-                        {"c": b["c"], "h": b["h"], "l": b["l"], "h": b["h"], "l": b["l"]}
-                        for b in bars_response["bars"].values()
+                        {"c": b["c"], "h": b["h"], "l": b["l"]}
+                        for b in bars_list
                     ]
 
                     if len(bars) >= 20:
@@ -330,7 +334,13 @@ def run_trading_routine(state):
         # Get bars for volatility/trend calculation
         try:
             bars_response = get_bars("SPY", "1Day", limit=50)
-            bars = [{"c": b["c"], "h": b["h"], "l": b["l"], "h": b["h"], "l": b["l"]} for b in bars_response["bars"].values()] if "bars" in bars_response else None
+            if "bars" in bars_response:
+                bars_list = bars_response["bars"]
+                if isinstance(bars_list, dict):
+                    bars_list = list(bars_list.values())
+                bars = [{"c": b["c"], "h": b["h"], "l": b["l"]} for b in bars_list]
+            else:
+                bars = None
         except:
             bars = None
 
@@ -415,7 +425,13 @@ def run_trading_routine(state):
             # Get bars for this symbol
             try:
                 bars_response = get_bars(symbol, "1Day", limit=50)
-                bars = [{"c": b["c"], "h": b["h"], "l": b["l"]} for b in bars_response["bars"].values()] if "bars" in bars_response else None
+                if "bars" in bars_response:
+                    bars_list = bars_response["bars"]
+                    if isinstance(bars_list, dict):
+                        bars_list = list(bars_list.values())
+                    bars = [{"c": b["c"], "h": b["h"], "l": b["l"]} for b in bars_list]
+                else:
+                    bars = None
             except:
                 bars = None
 
