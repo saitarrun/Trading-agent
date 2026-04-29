@@ -5,18 +5,22 @@ from regime import MarketRegimeDetector
 from allocation import PortfolioAllocator
 
 class WalkForwardBacktester:
-    """Walk-forward backtesting engine (avoids look-ahead bias).
+    """Walk-forward backtesting engine with slippage simulation.
 
-    Splits data into:
-    - Training window: fit regime model
-    - Test window: evaluate strategy performance
+    Features:
+    - Training window: fit regime model (60 days)
+    - Test window: evaluate strategy (20 days)
+    - Slippage: 0.1% buy orders, 0.05% sell orders (realistic fills)
+    - No look-ahead bias (forward algorithm only)
     """
 
-    def __init__(self, train_window_days=60, test_window_days=20):
+    def __init__(self, train_window_days=60, test_window_days=20, buy_slippage_pct=0.001, sell_slippage_pct=0.0005):
         self.train_window_days = train_window_days
         self.test_window_days = test_window_days
         self.regime_detector = MarketRegimeDetector()
         self.allocator = PortfolioAllocator()
+        self.buy_slippage_pct = buy_slippage_pct  # 0.1% worse fill on buys
+        self.sell_slippage_pct = sell_slippage_pct  # 0.05% worse fill on sells
 
     def split_data(self, bars, split_date):
         """Split bars into train (before split) and test (after split)."""
@@ -52,6 +56,7 @@ class WalkForwardBacktester:
             }
 
             period_pnl = 0
+            total_slippage = 0
             for test_bar in test_bars:
                 test_window = [b for b in test_bars if b['t'] <= test_bar['t']]
 
@@ -64,10 +69,17 @@ class WalkForwardBacktester:
 
                 if characteristics['direction'] == 'up':
                     pnl = current_capital * 0.001
+                    slippage = current_capital * self.buy_slippage_pct
+                    pnl -= slippage
+                    total_slippage += slippage
                 elif characteristics['direction'] == 'down':
                     pnl = -current_capital * 0.001
+                    slippage = current_capital * self.sell_slippage_pct
+                    pnl -= slippage
+                    total_slippage += slippage
                 else:
                     pnl = 0
+                    slippage = 0
 
                 pnl_pct = (pnl / current_capital) * 100
                 current_capital += pnl
@@ -78,8 +90,11 @@ class WalkForwardBacktester:
                     "regime": regime,
                     "confidence": float(confidence),
                     "pnl": pnl,
+                    "slippage": slippage,
                     "capital": current_capital
                 })
+
+            period_result["slippage_total"] = total_slippage
 
             result_return = (period_pnl / (starting_capital if split_idx == 0 else current_capital - period_pnl)) * 100
             period_result["return_pct"] = result_return
