@@ -16,6 +16,10 @@ from regime import MarketRegimeDetector
 from allocation import PortfolioAllocator
 from safety import SafetyManager
 from trade import get_market_status
+from macro import MacroAnalyzer
+from technical import TechnicalAnalyzer
+from fundamentals import FundamentalAnalyzer, SectorAnalyzer
+from strategies import StrategySelector
 
 class OrchestratorState:
     """Tracks system state for resilience and error handling."""
@@ -152,7 +156,7 @@ def sync_components():
         return False
 
 def run_research_routine(state):
-    """Morning routine: fetch data, detect regime, log findings."""
+    """Morning routine: macro → sector → stock analysis, detect regime, log findings."""
     print("[RESEARCH] Starting morning research routine...")
 
     try:
@@ -165,6 +169,19 @@ def run_research_routine(state):
         today_date = datetime.now().strftime("%Y-%m-%d")
         journal_file = Path(f"journal/{today_date}.md")
 
+        # MACRO ANALYSIS (Top-down start)
+        print("[RESEARCH] Running macro analysis...")
+        macro = MacroAnalyzer()
+        macro_data = macro.analyze()
+        print(f"[RESEARCH] Macro sentiment: {macro_data['macro_sentiment']} (VIX: {macro_data['vix']:.1f})")
+
+        # SECTOR ANALYSIS
+        print("[RESEARCH] Running sector analysis...")
+        sector_analyzer = SectorAnalyzer()
+        sector_data = sector_analyzer.analyze()
+        print(f"[RESEARCH] Top sector: {sector_data['ranked_sectors'][0]['sector'] if sector_data['ranked_sectors'] else 'N/A'}")
+
+        # STOCK-LEVEL ANALYSIS
         regime_detector = MarketRegimeDetector()
         findings = []
 
@@ -178,25 +195,52 @@ def run_research_routine(state):
                 bars_response = get_bars(symbol, "1Day", limit=100)
                 if "bars" in bars_response:
                     bars = [
-                        {"c": b["c"], "h": b["h"], "l": b["l"]}
+                        {"c": b["c"], "h": b["h"], "l": b["l"], "h": b["h"], "l": b["l"]}
                         for b in bars_response["bars"].values()
                     ]
 
                     if len(bars) >= 20:
+                        # Regime detection
                         regime_detector.fit(bars)
                         regime, confidence, uncertain = regime_detector.predict_regime(bars)
                         characteristics = regime_detector.get_regime_characteristics(regime, uncertain)
+
+                        # Technical analysis
+                        tech_analyzer = TechnicalAnalyzer(bars)
+                        tech_data = tech_analyzer.analyze()
+
+                        # Strategy selection
+                        strategy_selector = StrategySelector(bars)
+                        strategy_data = strategy_selector.analyze()
+
+                        # Fundamental analysis
+                        fund_analyzer = FundamentalAnalyzer(symbol)
+                        fund_data = fund_analyzer.analyze()
 
                         findings.append({
                             "symbol": symbol,
                             "regime": regime,
                             "confidence": float(confidence),
                             "uncertain": uncertain,
-                            "characteristics": characteristics
+                            "characteristics": characteristics,
+                            "technical": {
+                                "rsi": tech_data['rsi'],
+                                "macd_bullish": tech_data['macd']['bullish'],
+                                "trend": tech_data['trend'],
+                                "signal": tech_data['trade_signal']
+                            },
+                            "strategy": {
+                                "selected": strategy_data['selected_strategy'],
+                                "confidence": strategy_data['strategy_details'].get('confidence', 0)
+                            },
+                            "fundamental": {
+                                "overall_score": fund_data['overall_score'] if fund_data else 0,
+                                "qualifies": fund_data['qualifies'] if fund_data else False
+                            }
                         })
 
                         status = "UNCERTAIN" if uncertain else "stable"
-                        print(f"[RESEARCH] {symbol}: {regime} (confidence: {confidence:.2%}, {status})")
+                        print(f"[RESEARCH] {symbol}: {regime} (tech: {tech_data['trade_signal']}, strategy: {strategy_data['selected_strategy']}, fund: {fund_data['overall_score']:.0f}/100)")
             except Exception as e:
                 print(f"[RESEARCH] Error processing {symbol}: {e}")
 
@@ -209,21 +253,34 @@ def run_research_routine(state):
         regime_history.append({
             "timestamp": datetime.now().isoformat(),
             "findings": findings,
+            "macro": macro_data,
+            "sectors": sector_data,
             "regime": findings[0]["regime"] if findings else "neutral",
             "confidence": findings[0]["confidence"] if findings else 0.0,
             "characteristics": findings[0]["characteristics"] if findings else {}
         })
 
         with open(regime_history_file, 'w') as f:
-            json.dump(regime_history, f, indent=2)
+            json.dump(regime_history, f, indent=2, default=str)
 
         journal_content = f"# Trade Journal — {today_date}\n\n"
-        journal_content += "## Market Research\n"
+        journal_content += "## Macro Analysis\n"
+        journal_content += f"- Sentiment: {macro_data['macro_sentiment']} (score: {macro_data['macro_score']:.2f})\n"
+        journal_content += f"- VIX: {macro_data['vix']:.1f}\n"
+        journal_content += f"- Yield curve: {macro_data['yield_curve_status']}\n"
+        journal_content += f"- Leverage multiplier: {macro_data['leverage_multiplier']:.2f}x\n"
+
+        journal_content += "\n## Sector Analysis\n"
+        for rank_item in sector_data.get('ranked_sectors', [])[:5]:
+            journal_content += f"- {rank_item['rank']}. {rank_item['sector']}: {rank_item['return']:.2%}\n"
+
+        journal_content += "\n## Stock Research\n"
         for finding in findings:
             journal_content += f"\n### {finding['symbol']}\n"
             journal_content += f"- Regime: {finding['regime']} (confidence: {finding['confidence']:.2%})\n"
-            journal_content += f"- Volatility: {finding['characteristics']['volatility']}\n"
-            journal_content += f"- Direction: {finding['characteristics']['direction']}\n"
+            journal_content += f"- Technical: RSI {finding['technical']['rsi']:.0f}, MACD {'bullish' if finding['technical']['macd_bullish'] else 'bearish'}, Trend: {finding['technical']['trend']}\n"
+            journal_content += f"- Signal: {finding['technical']['signal']} | Strategy: {finding['strategy']['selected']}\n"
+            journal_content += f"- Fundamental score: {finding['fundamental']['overall_score']:.0f}/100 {'✓' if finding['fundamental']['qualifies'] else '✗'}\n"
 
         with open(journal_file, 'w') as f:
             f.write(journal_content)
@@ -239,7 +296,7 @@ def run_research_routine(state):
         return False
 
 def run_trading_routine(state):
-    """Main trading routine: evaluate regime and place trades."""
+    """Main trading routine: evaluate regime + macro + technical and place trades."""
     print("[TRADING] Starting trading session...")
 
     try:
@@ -260,22 +317,48 @@ def run_trading_routine(state):
                 regime_data = regime_history[-1] if regime_history else {}
 
         regime = regime_data.get("regime", "neutral")
-        print(f"[TRADING] Current regime: {regime}")
+        macro_data = regime_data.get("macro", {})
+        sector_data = regime_data.get("sectors", {})
+
+        print(f"[TRADING] Current regime: {regime} (macro: {macro_data.get('macro_sentiment', 'unknown')})")
 
         allocator = PortfolioAllocator(risk_tolerance="moderate")
 
         # Get bars for volatility/trend calculation
         try:
             bars_response = get_bars("SPY", "1Day", limit=50)
-            bars = [{"c": b["c"], "h": b["h"], "l": b["l"]} for b in bars_response["bars"].values()] if "bars" in bars_response else None
+            bars = [{"c": b["c"], "h": b["h"], "l": b["l"], "h": b["h"], "l": b["l"]} for b in bars_response["bars"].values()] if "bars" in bars_response else None
         except:
             bars = None
 
-        allocation = allocator.calculate_allocation(regime, current_value, positions if isinstance(positions, list) else [], bars, regime_data.get("uncertain", False))
+        # Calculate allocation with macro + technical overlay
+        macro_multiplier = macro_data.get('leverage_multiplier', 1.0)
+        sector_weights = sector_data.get('sector_weights', {})
+
+        # Get SPY technical signal for market-level confirmation
+        spy_tech_signal = "hold"
+        if bars:
+            try:
+                spy_tech = TechnicalAnalyzer(bars)
+                spy_analysis = spy_tech.analyze()
+                spy_tech_signal = spy_analysis['trade_signal']
+            except:
+                pass
+
+        allocation = allocator.calculate_allocation(
+            regime,
+            current_value,
+            positions if isinstance(positions, list) else [],
+            bars,
+            regime_data.get("uncertain", False),
+            macro_multiplier=macro_multiplier,
+            sector_weights=sector_weights,
+            technical_signal=spy_tech_signal
+        )
 
         print(f"[TRADING] Max position size: ${allocation['max_position_size']:,.0f}")
         print(f"[TRADING] Target cash: ${allocation['target_cash']:,.0f}")
-        print(f"[TRADING] Leverage: {allocation['leverage_multiplier']}x")
+        print(f"[TRADING] Leverage: {allocation['leverage_multiplier']:.2f}x (macro: {macro_multiplier:.2f}x, tech: {spy_tech_signal})")
 
         safety = SafetyManager(initial_capital=current_value)
         safety_status = safety.get_circuit_breaker_status(current_value)
@@ -351,7 +434,7 @@ def run_trading_routine(state):
         return False
 
 def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status):
-    """Evaluate single symbol and place orders if conditions met."""
+    """Evaluate single symbol using regime + technical + strategy, place orders if conditions met."""
     try:
         if not market_status.get("is_open"):
             return None
@@ -363,8 +446,25 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         account_value = float(account['portfolio_value'])
         uncertain = False  # Would be passed from regime detection
 
+        # Technical analysis
+        tech_analyzer = TechnicalAnalyzer(bars)
+        tech_data = tech_analyzer.analyze()
+        tech_signal = tech_data['trade_signal']
+
+        # Strategy selection
+        strategy_selector = StrategySelector(bars)
+        strategy_data = strategy_selector.analyze()
+        selected_strategy = strategy_data['selected_strategy']
+
         # Get allocation for this regime
-        allocation = allocator.calculate_allocation(regime, account_value, positions if isinstance(positions, list) else [], bars, uncertain)
+        allocation = allocator.calculate_allocation(
+            regime,
+            account_value,
+            positions if isinstance(positions, list) else [],
+            bars,
+            uncertain,
+            technical_signal=tech_signal
+        )
         max_size = allocation["max_position_size"]
         leverage = allocation["leverage_multiplier"]
 
@@ -372,20 +472,47 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         existing_pos = next((p for p in (positions if isinstance(positions, list) else []) if p['symbol'] == symbol), None)
         current_qty = int(existing_pos['qty']) if existing_pos else 0
 
-        # Decide action based on regime + trend
+        # Decide action based on regime + technical confirmation + strategy
+        action = None
+        reason = ""
+
         if regime == "crash":
             action = "sell" if current_qty > 0 else None
+            reason = "Crash regime - liquidate"
         elif regime == "bear":
-            action = "sell" if current_qty > 0 else None
+            if tech_signal == "sell":
+                action = "sell" if current_qty > 0 else None
+                reason = f"Bear regime + technical sell signal"
+            else:
+                reason = "Bear regime - hold"
         elif regime == "euphoria":
-            action = "sell" if current_qty > 20 else None  # Take profits
+            if current_qty > 0 and tech_signal == "sell":
+                action = "sell"
+                reason = "Euphoria + technical sell - take profits"
+            else:
+                reason = "Euphoria - reduce"
         elif regime == "bull":
-            action = "buy" if current_qty == 0 else None
+            if tech_signal == "buy" and selected_strategy == "breakout_trading":
+                action = "buy" if current_qty == 0 else None
+                reason = f"Bull regime + breakout confirmation"
+            elif tech_signal == "buy" and current_qty == 0:
+                action = "buy"
+                reason = f"Bull regime + {selected_strategy} signal"
         else:  # neutral
-            action = None  # Hold
+            if tech_signal == "buy" and selected_strategy in ["range_trading", "momentum_trading"]:
+                action = "buy" if current_qty == 0 else None
+                reason = f"Neutral with {selected_strategy} + tech buy"
+            else:
+                reason = f"Neutral regime - hold (strategy: {selected_strategy})"
 
         if not action or not safety_status['trading_enabled']:
-            return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": f"Regime {regime}, safety enabled: {safety_status['trading_enabled']}"}
+            return {
+                "symbol": symbol,
+                "action": "hold",
+                "qty": 0,
+                "price": current_price,
+                "reason": reason if reason else f"No signal (safety: {safety_status['trading_enabled']})"
+            }
 
         # Size position
         qty = int(max_size / current_price) if max_size > 0 else 0
@@ -397,9 +524,8 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         qty = int(qty * throttle)
 
         if action == "sell" and current_qty > 0:
-            # Close position
             sell_qty = current_qty
-            limit_price = current_price * 0.99  # Sell at slight discount
+            limit_price = current_price * 0.99
             from trade import place_order
             result = place_order(symbol, sell_qty, "sell", limit_price)
             return {
@@ -407,12 +533,11 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
                 "action": "sell",
                 "qty": sell_qty,
                 "price": limit_price,
-                "reason": f"{regime} regime, close position",
+                "reason": reason,
                 "order_result": result
             }
         elif action == "buy" and qty > 0:
-            # Open position
-            limit_price = current_price * 1.001  # Buy at slight premium
+            limit_price = current_price * 1.001
             from trade import place_order
             result = place_order(symbol, qty, "buy", limit_price)
             return {
@@ -420,11 +545,11 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
                 "action": "buy",
                 "qty": qty,
                 "price": limit_price,
-                "reason": f"{regime} regime, entry signal",
+                "reason": reason,
                 "order_result": result
             }
 
-        return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "No signal"}
+        return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": reason}
 
     except Exception as e:
         print(f"[TRADING] Error evaluating {symbol}: {e}")

@@ -115,8 +115,8 @@ class PortfolioAllocator:
         else:  # <1% from MA = weak/uncertain
             return 0.85
 
-    def calculate_allocation(self, regime, account_value, current_positions=None, bars=None, uncertain=False):
-        """Calculate ideal portfolio allocation for regime + volatility.
+    def calculate_allocation(self, regime, account_value, current_positions=None, bars=None, uncertain=False, macro_multiplier=1.0, sector_weights=None, technical_signal=None):
+        """Calculate ideal portfolio allocation for regime + volatility + macro + sector + technical.
 
         Args:
             regime: Current market regime
@@ -124,15 +124,23 @@ class PortfolioAllocator:
             current_positions: List of open positions
             bars: Historical bars for volatility calculation
             uncertain: Flag if regime is flickering
+            macro_multiplier: Macro leverage adjustment (0.5-1.5)
+            sector_weights: Dict of sector weights
+            technical_signal: Technical trade signal (buy/sell/hold)
 
         Returns dict with dynamic allocation adjusted for:
         - Market volatility
         - Trend strength
         - Risk tolerance
         - Regime uncertainty
+        - Macro conditions (VIX, yield curve, rates)
+        - Sector performance overlay
+        - Technical confirmation
         """
         if current_positions is None:
             current_positions = []
+        if sector_weights is None:
+            sector_weights = {}
 
         allocation = self.regime_allocations.get(regime, self.regime_allocations["neutral"])
 
@@ -141,9 +149,18 @@ class PortfolioAllocator:
         trend_adj = self.calculate_trend_strength(bars) if bars else 1.0
         risk_adj = self.risk_multipliers.get(self.risk_tolerance, 1.0)
         uncertainty_adj = 0.7 if uncertain else 1.0  # Reduce if regime uncertain
+        macro_adj = macro_multiplier  # Macro overlay (bearish macro reduces leverage)
 
-        # Combine all adjustments
-        total_adjustment = volatility_adj * trend_adj * risk_adj * uncertainty_adj
+        # Technical signal adjustment
+        technical_adj = 1.0
+        if technical_signal == "buy":
+            technical_adj = 1.2
+        elif technical_signal == "sell":
+            technical_adj = 0.6
+        # "hold" keeps technical_adj at 1.0
+
+        # Combine all adjustments (macro is portfolio-wide, technical is more tactical)
+        total_adjustment = volatility_adj * trend_adj * risk_adj * uncertainty_adj * macro_adj * technical_adj
 
         # Apply to base allocation
         position_size_pct = allocation["position_size_pct"] * total_adjustment
@@ -169,8 +186,12 @@ class PortfolioAllocator:
                 "trend": trend_adj,
                 "risk_tolerance": risk_adj,
                 "uncertainty": uncertainty_adj,
+                "macro": macro_adj,
+                "technical": technical_adj,
                 "total": total_adjustment
-            }
+            },
+            "sector_weights": sector_weights,
+            "technical_signal": technical_signal
         }
 
     def should_reduce_positions(self, regime):

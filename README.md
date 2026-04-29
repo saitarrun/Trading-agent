@@ -1,24 +1,15 @@
-# 24/7 AI Trading Agent with Regime Detection
+# AI Trading Agent: Macro → Sector → Stock → Technical → Execution
 
-Autonomous trading agent using Claude Code, Alpaca API, and Hidden Markov Models for market regime detection. Runs on paper trading (default) with regime-aware allocation and hardcoded circuit breakers.
+Autonomous regime-aware trading agent with comprehensive multi-layer analysis pipeline.
 
-## Architecture
-
-**Brain (HMM Regime Detection):** Detects market state (crash, bear, neutral, bull, euphoria)
-  - Auto-detects optimal states (3-7) via BIC
-  - Forward algorithm only (prevents look-ahead bias)
-  - Stability filter (3-bar persistence, no flickering)
-  - Uncertainty detection (flags regimes with >4 changes in 20 bars)
-  - Trained on 2+ years of historical data
-
-**Allocation Engine:** Dynamically sizes positions based on regime + volatility
-  - Volatility-based sizing (high vol = reduce exposure, low vol = increase)
-  - Trend-aware allocation (strong trends = increase, weak = reduce)
-  - Risk tolerance customization (conservative/moderate/aggressive)
-  - Uncertainty discount (reduce all sizes if regime is flickering)
-**Safety Net:** Circuit breakers (2% daily loss, 5% max drawdown) + throttling
-**Risk Manager:** Position validation, stop-loss enforcement
-**Dashboard:** Streamlit UI for monitoring
+**Macro Analysis** (portfolio-level overlay): VIX, yield curve, Fed funds → leverage multiplier (0.5x-1.5x)
+**Sector Analysis** (allocation weighting): Sector ETF performance → weights per sector (0.8x-1.2x)
+**Technical Analysis** (trade signals): RSI, MACD, support/resistance, Fibonacci, moving averages
+**Strategy Selection** (confirmation): Trend, range, breakout, reversal, momentum trading
+**Fundamental Screening** (stock quality): P/E, EPS growth, profitability, debt levels
+**Regime Detection** (HMM): Market state (crash/bear/neutral/bull/euphoria) → base allocation
+**Execution** (orders): Position sizing × macro × sector × technical → limit order placement
+**Safety Limits** (circuit breakers): 2% daily loss, 5% max drawdown → throttling/halt
 
 ## Setup
 
@@ -48,12 +39,19 @@ Autonomous trading agent using Claude Code, Alpaca API, and Hidden Markov Models
 
 ## Files
 
+**Multi-Layer Analysis:**
+- `scripts/macro.py` — VIX, yield curve, Fed funds → leverage multiplier (0.5x-1.5x)
+- `scripts/sector.py` (in fundamentals.py) — Sector ETF returns → allocation weights
+- `scripts/technical.py` — RSI, MACD, support/resistance, Fibonacci, moving averages
+- `scripts/strategies.py` — Strategy selection (trend, range, breakout, reversal, momentum)
+- `scripts/fundamentals.py` — Stock screening (P/E, EPS, profitability, debt, ROE)
+
 **Core Engine:**
-- `scripts/regime.py` — HMM for crash/bear/neutral/bull/euphoria detection
-- `scripts/allocation.py` — Dynamic position sizing per regime
+- `scripts/regime.py` — HMM regime detection (crash/bear/neutral/bull/euphoria)
+- `scripts/allocation.py` — Position sizing (regime × volatility × trend × macro × sector × technical)
 - `scripts/safety.py` — Circuit breakers (2% daily loss, 5% drawdown)
-- `scripts/backtest.py` — Walk-forward backtesting (no look-ahead bias)
-- `scripts/orchestrate.py` — Main orchestration + error handling
+- `scripts/backtest.py` — Walk-forward backtesting
+- `scripts/orchestrate.py` — Main orchestration (research → trading → EOD)
 
 **Data & Trading:**
 - `scripts/research.py` — Market data fetching (bars, news, account)
@@ -102,17 +100,43 @@ streamlit run dashboard.py
 ```
 Opens UI at `localhost:8501` showing positions, regime, safety status, trade journal.
 
-## Market Regimes
+## Market Regimes (HMM-Detected)
 
-| Regime | Signal | Action |
-|--------|--------|--------|
-| Crash | ↓ High vol | 0x leverage, 95% cash |
-| Bear | ↓ Medium vol | 0.5x leverage, 70% cash |
-| Neutral | ↔ Low vol | 1.0x leverage, 20% cash |
-| Bull | ↑ Medium vol | 1.5x leverage, 15% cash |
-| Euphoria | ↑ High vol | 1.0x leverage, 30% cash |
+| Regime | Signal | Base Leverage | Cash Reserve |
+|--------|--------|---|---|
+| Crash | ↓ High vol, downtrend | 0.0x | 95% |
+| Bear | ↓ Medium vol, downtrend | 0.5x | 70% |
+| Neutral | ↔ Low vol, sideways | 1.0x | 20% |
+| Bull | ↑ Medium vol, uptrend | 1.5x | 15% |
+| Euphoria | ↑ High vol, unsustainable | 1.0x | 30% |
 
-Agent detects via HMM on 20-day returns + intraday volatility.
+Detected via HMM on 20-day returns + intraday volatility (3-7 auto-selected states).
+
+## Trading Strategies (Adaptive)
+
+Agent selects strategy based on market conditions:
+
+| Strategy | Trigger | Entry | Exit | Best For |
+|----------|---------|-------|------|----------|
+| **Trend Trading** | Bull + strong uptrend | Dips to MA support | Trend break | 20%+ sustained moves |
+| **Breakout Trading** | Consolidation + low vol | Close above resistance | Below breakout | Volatility expansion |
+| **Range Trading** | Sideways (neutral) | At support | At resistance | Choppy, low-vol markets |
+| **Reversal Trading** | Bottom/top reversal detected | Confirm reversal pattern | Opposite reversal | Mean-reverting bounces |
+| **Momentum Trading** | ROC >1% despite pullback | Dips in strong trend | Overbought (RSI >70) | Add to winning positions |
+
+Technical confirmation (RSI <70 for buy, >30 for sell) + macro overlay (reduce size in bearish macro).
+
+## Macro Overlay (Portfolio-Level)
+
+Adjusts leverage based on macro conditions:
+
+| Condition | Leverage Multiplier | Rationale |
+|-----------|---|---|
+| VIX >30, inverted curve, high rates | 0.5x | Risk-off environment |
+| VIX 15-20, normal curve, moderate rates | 1.0x | Neutral macro |
+| VIX <15, normal curve, stable rates | 1.5x | Risk-on environment |
+
+Applied to all positions equally. Reduces risk in bearish macro, increases in bullish.
 
 ## Safety Rules (Hardcoded)
 
