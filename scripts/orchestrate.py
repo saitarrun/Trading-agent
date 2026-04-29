@@ -302,6 +302,7 @@ def run_trading_routine(state):
     print("[TRADING] Starting trading session...")
 
     try:
+        watchlist_path = Path("watchlist.json")
         market_status = get_market_status()
         if not market_status.get("is_open"):
             print("[TRADING] Market closed, skipping trades.")
@@ -422,7 +423,7 @@ def run_trading_routine(state):
                 continue
 
             # Evaluate and execute
-            trade_result = evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker, position_tracker)
+            trade_result = evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker, position_tracker, market_status, regime_data.get("uncertain", False))
 
             if trade_result:
                 trades_executed.append(trade_result)
@@ -453,10 +454,10 @@ def run_trading_routine(state):
         state.record_routine("trading", success=False)
         return False
 
-def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker=None, position_tracker=None):
+def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safety, safety_status, performance_tracker=None, position_tracker=None, market_status=None, uncertain=False):
     """Evaluate single symbol using regime + technical + strategy, place orders if conditions met."""
     try:
-        if not market_status.get("is_open"):
+        if not market_status or not market_status.get("is_open"):
             return None
 
         current_price = bars[-1]["c"] if bars else None
@@ -464,7 +465,6 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
             return None
 
         account_value = float(account['portfolio_value'])
-        uncertain = False  # Would be passed from regime detection
 
         # Technical analysis
         tech_analyzer = TechnicalAnalyzer(bars)
@@ -555,7 +555,9 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
         if action == "sell" and current_qty > 0:
             sell_qty = current_qty
             limit_price = current_price * 0.99
-            from trade import place_order
+            from trade import place_order, validate_order
+            if not validate_order(symbol, sell_qty, "sell", current_price, account_value, positions if isinstance(positions, list) else []):
+                return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "Order validation failed"}
             result = place_order(symbol, sell_qty, "sell", limit_price)
             return {
                 "symbol": symbol,
@@ -567,7 +569,9 @@ def evaluate_and_trade(symbol, regime, bars, account, positions, allocator, safe
             }
         elif action == "buy" and qty > 0:
             limit_price = current_price * 1.001
-            from trade import place_order
+            from trade import place_order, validate_order
+            if not validate_order(symbol, qty, "buy", current_price, account_value, positions if isinstance(positions, list) else []):
+                return {"symbol": symbol, "action": "hold", "qty": 0, "price": current_price, "reason": "Order validation failed"}
             result = place_order(symbol, qty, "buy", limit_price)
 
             # Record entry in position tracker for exit detection
@@ -644,9 +648,14 @@ def run_main_loop(interval_seconds=300):
         return False
 
     iteration = 0
+    last_research_hour = -1
+    last_trading_hour = -1
+    last_eod_hour = -1
+
     while True:
         iteration += 1
-        print(f"\n[LOOP] Iteration {iteration} at {datetime.now().isoformat()}")
+        now = datetime.now()
+        print(f"\n[LOOP] Iteration {iteration} at {now.isoformat()}")
 
         try:
             if not state.is_healthy():
@@ -654,23 +663,39 @@ def run_main_loop(interval_seconds=300):
                 break
 
             market_status = get_market_status()
+
+            # B5 FIX: Time-based dispatch of routines
             if market_status.get("is_open"):
-                print(f"[LOOP] Market is open. Checking regime and positions...")
+                print(f"[LOOP] Market is open. Checking scheduled routines...")
 
-                regime_history_file = Path("journal/regime_history.json")
-                if regime_history_file.exists():
-                    with open(regime_history_file, 'r') as f:
-                        regime_history = json.load(f)
-                        latest_regime = regime_history[-1].get("regime", "neutral") if regime_history else "neutral"
-                else:
-                    latest_regime = "neutral"
+                # 9:45 AM ET: Run research
+                if now.hour == 9 and now.minute >= 45 and last_research_hour != now.hour:
+                    print("[LOOP] Running research routine (9:45 AM)...")
+                    run_research_routine(state)
+                    last_research_hour = now.hour
 
-                account = get_account()
-                safety = SafetyManager(initial_capital=float(account['portfolio_value']))
-                safety_status = safety.get_circuit_breaker_status(float(account['portfolio_value']))
+                # 10:00 AM ET: Run trading
+                if now.hour == 10 and now.minute >= 0 and last_trading_hour != now.hour:
+                    print("[LOOP] Running trading routine (10:00 AM)...")
+                    run_trading_routine(state)
+                    last_trading_hour = now.hour
 
-                if not safety_status['trading_enabled']:
-                    print(f"[LOOP] Circuit breaker active. Throttle: {safety.calculate_throttle_factor(float(account['portfolio_value'])):.0%}")
+                # 12:00 PM ET: Midday check
+                if now.hour == 12 and now.minute >= 0:
+                    account = get_account()
+                    safety = SafetyManager(initial_capital=float(account['portfolio_value']))
+                    safety_status = safety.get_circuit_breaker_status(float(account['portfolio_value']))
+                    if not safety_status['trading_enabled']:
+                        throttle = safety.calculate_throttle_factor(float(account['portfolio_value']))
+                        print(f"[LOOP] Midday check: Circuit breaker active. Throttle: {throttle:.0%}")
+                    else:
+                        print("[LOOP] Midday check: System nominal.")
+
+                # 4:15 PM ET: Run EOD
+                if now.hour == 16 and now.minute >= 15 and last_eod_hour != now.hour:
+                    print("[LOOP] Running EOD routine (4:15 PM)...")
+                    run_eod_routine(state)
+                    last_eod_hour = now.hour
             else:
                 print(f"[LOOP] Market closed until {market_status.get('next_open')}")
 

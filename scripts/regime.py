@@ -71,6 +71,10 @@ class MarketRegimeDetector:
         Args:
             bars: List of dicts with 'c' (close) and 'h', 'l' (high, low)
         """
+        # H7 FIX: Reset scaler for each fit to avoid state leakage across symbols
+        self.scaler_mean = None
+        self.scaler_std = None
+
         if len(bars) < 252:  # ~1 year of trading days
             print(f"Warning: Only {len(bars)} bars; recommend 252+ (1 year) or 504+ (2 years)")
 
@@ -83,10 +87,10 @@ class MarketRegimeDetector:
 
         X = self._prepare_features(returns, volatility)
 
-        # Auto-detect optimal number of states if not provided
+        # H6 FIX: Force n_states=5 to match REGIME_LABELS
         if self.n_states is None:
-            self.n_states = self._select_optimal_states(X)
-            print(f"Auto-selected {self.n_states} regimes")
+            self.n_states = 5
+            print(f"Using fixed 5 regimes (crash, bear, neutral, bull, euphoria)")
 
         self.model = hmm.GaussianHMM(
             n_components=self.n_states,

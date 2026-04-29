@@ -1,16 +1,1 @@
-{
-  "AAPL": {
-    "strategy": "trend_trading",
-    "regime": "bull",
-    "entry_price": 150.0,
-    "qty": 100,
-    "entry_time": "2026-04-28 10:00"
-  },
-  "MSFT": {
-    "strategy": "breakout_trading",
-    "regime": "neutral",
-    "entry_price": 300.0,
-    "qty": 50,
-    "entry_time": "2026-04-28 10:05"
-  }
-}
+{}

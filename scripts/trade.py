@@ -63,7 +63,7 @@ def validate_order(symbol, qty, side, current_price, account_value, current_posi
         return False, f"Order exceeds 10% allocation limit: {allocation_pct:.1f}%"
 
     # Check total exposure (positions + this order < 80%)
-    total_invested = sum(p.get('market_value', 0) for p in current_positions)
+    total_invested = sum(float(p.get('market_value', 0)) for p in current_positions)
     if (total_invested + order_value) / account_value > 0.80:
         return False, "Order would violate 20% cash reserve requirement"
 

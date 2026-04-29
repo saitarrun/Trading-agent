@@ -31,11 +31,11 @@ class MacroAnalyzer:
         try:
             # Fetch 10-year and 2-year Treasury yields
             tnx = yf.download("^TNX", period="1d", progress=False)  # 10-year
-            tlt = yf.download("SHY", period="1d", progress=False)   # Short-term (proxy for 2-year)
+            irx = yf.download("^IRX", period="1d", progress=False)  # 13-week T-bill (proxy for 2-year)
 
-            if tnx is not None and tlt is not None and len(tnx) > 0 and len(tlt) > 0:
+            if tnx is not None and irx is not None and len(tnx) > 0 and len(irx) > 0:
                 yield_10y = float(tnx["Close"].iloc[-1])
-                yield_2y = float(tlt["Close"].iloc[-1])
+                yield_2y = float(irx["Close"].iloc[-1])
 
                 curve_diff = yield_10y - yield_2y
                 self.yield_curve_status = "inverted" if curve_diff < 0 else "normal"
