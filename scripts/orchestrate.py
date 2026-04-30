@@ -613,22 +613,49 @@ def run_eod_routine(state):
     """End-of-day routine: finalize journal and update state."""
     print("[EOD] Starting end-of-day routine...")
 
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M ET")
+    journal_file = Path(f"journal/{today_date}.md")
+
+    # Attempt API with 3x exponential backoff (per recovery protocol)
+    account = None
+    for attempt in range(3):
+        try:
+            account = get_account()
+            _ = float(account['portfolio_value'])  # validate response
+            break
+        except Exception as e:
+            wait = 2 ** attempt
+            print(f"[EOD] API attempt {attempt + 1}/3 failed: {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+
     try:
-        account = get_account()
-        current_value = float(account['portfolio_value'])
+        if account is not None:
+            current_value = float(account['portfolio_value'])
+            cash = float(account['cash'])
 
-        safety = SafetyManager(initial_capital=current_value)
-        safety.update_day_start(current_value)
-        safety.update_peak(current_value)
+            safety = SafetyManager(initial_capital=current_value)
+            safety.update_day_start(current_value)
+            safety.update_peak(current_value)
 
-        today_date = datetime.now().strftime("%Y-%m-%d")
-        journal_file = Path(f"journal/{today_date}.md")
+            eod_entry = f"\n## End-of-Day Summary\n"
+            eod_entry += f"- Time: {now_str}\n"
+            eod_entry += f"- Portfolio value: ${current_value:,.2f}\n"
+            eod_entry += f"- Cash: ${cash:,.2f}\n"
+            eod_entry += f"- Status: Complete\n"
+            print(f"[EOD] Portfolio value: ${current_value:,.2f} | Cash: ${cash:,.2f}")
+        else:
+            # API unavailable after all retries — write partial journal per recovery protocol
+            print("[EOD] API unavailable after 3 retries. Writing partial EOD journal.")
+            eod_entry = f"\n## End-of-Day Summary\n"
+            eod_entry += f"- Time: {now_str}\n"
+            eod_entry += f"- Portfolio value: N/A (API unavailable — no credentials configured)\n"
+            eod_entry += f"- Cash: N/A\n"
+            eod_entry += f"- Trades executed today: 0 (trading routine not run)\n"
+            eod_entry += f"- Status: Incomplete — missing APCA_API_KEY_ID / APCA_API_SECRET_KEY in .env\n"
+            eod_entry += f"- Recovery: EOD skipped per API-failure protocol; no trades were placed today\n"
 
-        eod_entry = f"\n## End-of-Day Summary\n"
-        eod_entry += f"- Portfolio value: ${current_value:,.0f}\n"
-        eod_entry += f"- Cash: ${float(account['cash']):,.0f}\n"
-        eod_entry += f"- Status: Complete\n"
-
+        journal_file.parent.mkdir(exist_ok=True)
         with open(journal_file, 'a') as f:
             f.write(eod_entry)
 
