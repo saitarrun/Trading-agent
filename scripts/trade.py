@@ -10,6 +10,13 @@ ALPACA_KEY = os.getenv("APCA_API_KEY_ID")
 ALPACA_SECRET = os.getenv("APCA_API_SECRET_KEY")
 BASE_URL = os.getenv("APCA_BASE_URL")
 
+def _raise_for_status(response):
+    """Raise RuntimeError with status and body excerpt on non-2xx responses."""
+    if not (200 <= response.status_code < 300):
+        raise RuntimeError(
+            f"Alpaca API {response.status_code}: {response.text[:300]}"
+        )
+
 def place_order(symbol, qty, side, limit_price=None):
     """Place a buy or sell order."""
     headers = {
@@ -31,6 +38,7 @@ def place_order(symbol, qty, side, limit_price=None):
 
     url = f"{BASE_URL}/v2/orders"
     response = requests.post(url, headers=headers, json=order_data)
+    _raise_for_status(response)
     return response.json()
 
 def cancel_all_orders():
@@ -41,6 +49,7 @@ def cancel_all_orders():
     }
     url = f"{BASE_URL}/v2/orders"
     response = requests.delete(url, headers=headers)
+    _raise_for_status(response)
     return response.status_code
 
 def get_market_status():
@@ -51,6 +60,7 @@ def get_market_status():
     }
     url = f"{BASE_URL}/v2/clock"
     response = requests.get(url, headers=headers)
+    _raise_for_status(response)
     return response.json()
 
 def validate_order(symbol, qty, side, current_price, account_value, current_positions):

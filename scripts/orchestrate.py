@@ -307,12 +307,44 @@ def run_trading_routine(state):
 
     try:
         watchlist_path = Path("watchlist.json")
-        market_status = get_market_status()
+
+        # Retry market status 3x with exponential backoff (recovery protocol)
+        market_status = None
+        for attempt in range(3):
+            try:
+                market_status = get_market_status()
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                print(f"[TRADING] API attempt {attempt + 1}/3 failed: {e}. Retrying in {wait}s...")
+                time.sleep(wait)
+
+        if market_status is None:
+            print("[TRADING] API unavailable after 3 retries. Skipping routine per recovery protocol.")
+            state.record_routine("trading", success=False)
+            return False
+
         if not market_status.get("is_open"):
             print("[TRADING] Market closed, skipping trades.")
             return False
 
-        account = get_account()
+        # Retry account/positions with same backoff
+        account = None
+        for attempt in range(3):
+            try:
+                account = get_account()
+                _ = float(account['portfolio_value'])
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                print(f"[TRADING] Account API attempt {attempt + 1}/3 failed: {e}. Retrying in {wait}s...")
+                time.sleep(wait)
+
+        if account is None:
+            print("[TRADING] Account API unavailable after 3 retries. Skipping routine per recovery protocol.")
+            state.record_routine("trading", success=False)
+            return False
+
         positions = get_positions()
         current_value = float(account['portfolio_value'])
 

@@ -10,6 +10,13 @@ ALPACA_KEY = os.getenv("APCA_API_KEY_ID")
 ALPACA_SECRET = os.getenv("APCA_API_SECRET_KEY")
 BASE_URL = os.getenv("APCA_BASE_URL")
 
+def _raise_for_status(response):
+    """Raise RuntimeError with status and body excerpt on non-2xx responses."""
+    if not (200 <= response.status_code < 300):
+        raise RuntimeError(
+            f"Alpaca API {response.status_code}: {response.text[:300]}"
+        )
+
 def get_bars(symbol, timeframe="1Day", limit=60):
     """Fetch historical price bars for a symbol."""
     headers = {
@@ -23,6 +30,7 @@ def get_bars(symbol, timeframe="1Day", limit=60):
         "adjustment": "raw"
     }
     response = requests.get(url, headers=headers, params=params)
+    _raise_for_status(response)
     return response.json()
 
 def get_account():
@@ -33,6 +41,7 @@ def get_account():
     }
     url = f"{BASE_URL}/v2/account"
     response = requests.get(url, headers=headers)
+    _raise_for_status(response)
     return response.json()
 
 def get_positions():
@@ -43,6 +52,7 @@ def get_positions():
     }
     url = f"{BASE_URL}/v2/positions"
     response = requests.get(url, headers=headers)
+    _raise_for_status(response)
     return response.json()
 
 def get_news(symbol):
@@ -58,6 +68,7 @@ def get_news(symbol):
         "sort": "desc"
     }
     response = requests.get(url, headers=headers, params=params)
+    _raise_for_status(response)
     return response.json()
 
 if __name__ == "__main__":
